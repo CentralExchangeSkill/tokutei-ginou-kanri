@@ -3,16 +3,36 @@ import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { PrismaClient, Role } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { LoginSchema, CreateWorkerSchema } from "@tokutei/shared";
+import { query } from "./db.js";
 
-const prisma = new PrismaClient();
+type Role = "ADMIN" | "USER";
+type WorkerStatus = "ACTIVE" | "INACTIVE";
+
+type AuthPayload = { sub: string; role: Role };
+
+type UserRow = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  role: Role;
+};
+
+type WorkerRow = {
+  id: string;
+  fullName: string;
+  nationality: string;
+  visaType: string;
+  visaExpiryDate: Date;
+  status: WorkerStatus;
+  createdAt: Date;
+};
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-type AuthPayload = { sub: string; role: Role };
 
 function auth(requiredRoles?: Role[]) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -40,7 +60,12 @@ app.post("/auth/login", async (req, res) => {
   const parsed = LoginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
-  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  const userResult = await query<UserRow>(
+    'SELECT id, email, "passwordHash", role FROM "User" WHERE email = $1 LIMIT 1',
+    [parsed.data.email]
+  );
+
+  const user = userResult.rows[0];
   if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
   const isMatch = await bcrypt.compare(parsed.data.password, user.passwordHash);
@@ -54,9 +79,12 @@ app.post("/auth/login", async (req, res) => {
 });
 
 app.get("/workers", auth(), async (_req, res) => {
-  const workers = await prisma.worker.findMany({ orderBy: { visaExpiryDate: "asc" } });
+  const workersResult = await query<WorkerRow>(
+    'SELECT id, "fullName", nationality, "visaType", "visaExpiryDate", status, "createdAt" FROM "Worker" ORDER BY "visaExpiryDate" ASC'
+  );
+
   res.json(
-    workers.map((w) => ({
+    workersResult.rows.map((w) => ({
       ...w,
       visaExpiryDate: w.visaExpiryDate.toISOString()
     }))
@@ -64,7 +92,12 @@ app.get("/workers", auth(), async (_req, res) => {
 });
 
 app.get("/workers/:id", auth(), async (req, res) => {
-  const worker = await prisma.worker.findUnique({ where: { id: req.params.id } });
+  const workerResult = await query<WorkerRow>(
+    'SELECT id, "fullName", nationality, "visaType", "visaExpiryDate", status, "createdAt" FROM "Worker" WHERE id = $1 LIMIT 1',
+    [req.params.id]
+  );
+
+  const worker = workerResult.rows[0];
   if (!worker) return res.status(404).json({ message: "Not found" });
 
   res.json({
@@ -76,17 +109,16 @@ app.get("/workers/:id", auth(), async (req, res) => {
   });
 });
 
-app.post("/workers", auth([Role.ADMIN]), async (req, res) => {
+app.post("/workers", auth(["ADMIN"]), async (req, res) => {
   const parsed = CreateWorkerSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
-  const created = await prisma.worker.create({
-    data: {
-      ...parsed.data,
-      visaExpiryDate: new Date(parsed.data.visaExpiryDate)
-    }
-  });
+  const createdResult = await query<WorkerRow>(
+    'INSERT INTO "Worker" (id, "fullName", nationality, "visaType", "visaExpiryDate", status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING id, "fullName", nationality, "visaType", "visaExpiryDate", status, "createdAt"',
+    [randomUUID(), parsed.data.fullName, parsed.data.nationality, parsed.data.visaType, parsed.data.visaExpiryDate, "ACTIVE"]
+  );
 
+  const created = createdResult.rows[0];
   res.status(201).json({ ...created, visaExpiryDate: created.visaExpiryDate.toISOString() });
 });
 

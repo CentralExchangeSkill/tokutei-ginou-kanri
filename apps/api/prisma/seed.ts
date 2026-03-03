@@ -1,38 +1,28 @@
+import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { PrismaClient, Role } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { pool } from "../src/db.js";
 
 async function main() {
   const passwordHash = await bcrypt.hash("password123", 10);
 
-  await prisma.user.upsert({
-    where: { email: "admin@example.com" },
-    update: {},
-    create: {
-      email: "admin@example.com",
-      role: Role.ADMIN,
-      passwordHash
-    }
-  });
+  await pool.query(
+    'INSERT INTO "User" (id, email, "passwordHash", role, "createdAt") VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (email) DO NOTHING',
+    [randomUUID(), "admin@example.com", passwordHash, "ADMIN"]
+  );
 
-  await prisma.user.upsert({
-    where: { email: "user@example.com" },
-    update: {},
-    create: {
-      email: "user@example.com",
-      role: Role.USER,
-      passwordHash
-    }
-  });
+  await pool.query(
+    'INSERT INTO "User" (id, email, "passwordHash", role, "createdAt") VALUES ($1, $2, $3, $4, NOW()) ON CONFLICT (email) DO NOTHING',
+    [randomUUID(), "user@example.com", passwordHash, "USER"]
+  );
 }
 
 main()
   .then(async () => {
-    await prisma.$disconnect();
+    await pool.end();
   })
   .catch(async (error) => {
     console.error(error);
-    await prisma.$disconnect();
+    await pool.end();
     process.exit(1);
   });
