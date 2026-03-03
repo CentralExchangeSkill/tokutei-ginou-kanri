@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { pool } from "../src/db.js";
+import { pool } from "./db.js";
 
 async function main() {
   const passwordHash = await bcrypt.hash("password123", 10);

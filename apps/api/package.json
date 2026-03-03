@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx src/seed.ts"
   },
   "dependencies": {
     "@tokutei/shared": "0.1.0",
