@@ -1,10 +1,21 @@
 {
   "name": "tokutei-ginou-kanri",
-  "version": "1.0.0",
-  "description": "Workers module demo",
-  "main": "server.js",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "start": "node server.js",
-    "check": "node --check server.js"
+    "dev": "concurrently -n web,api -c cyan,green \"npm run dev -w @tokutei/web\" \"npm run dev -w @tokutei/api\"",
+    "build": "npm run build -ws",
+    "typecheck": "npm run typecheck -ws",
+    "db:generate": "npm run db:generate -w @tokutei/api",
+    "db:migrate": "npm run db:migrate -w @tokutei/api",
+    "db:seed": "npm run db:seed -w @tokutei/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "typescript": "^5.6.2"
   }
 }
