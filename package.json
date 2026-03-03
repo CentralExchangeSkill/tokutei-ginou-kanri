@@ -10,8 +10,6 @@
     "dev": "concurrently -n web,api -c cyan,green \"npm run dev -w @tokutei/web\" \"npm run dev -w @tokutei/api\"",
     "build": "npm run build -ws",
     "typecheck": "npm run typecheck -ws",
-    "db:generate": "npm run db:generate -w @tokutei/api",
-    "db:migrate": "npm run db:migrate -w @tokutei/api",
     "db:seed": "npm run db:seed -w @tokutei/api"
   },
   "devDependencies": {
