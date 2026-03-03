@@ -1,0 +1,10 @@
+{
+  "name": "tokutei-ginou-kanri",
+  "version": "1.0.0",
+  "description": "Workers module demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  }
+}
