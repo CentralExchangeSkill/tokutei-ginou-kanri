@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workers</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Workers</h1>
+      <div id="workers"></div>
+    </div>
+
+    <script>
+      const getBadgeType = (dateValue) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expiry = new Date(`${dateValue}T00:00:00Z`);
+        const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 30) return { className: 'badge-urgent', label: 'urgent' };
+        if (diffDays <= 90) return { className: 'badge-warning', label: 'warning' };
+        return { className: 'badge-ok', label: 'ok' };
+      };
+
+      const renderWorkers = (workers) => {
+        const container = document.getElementById('workers');
+
+        if (workers.length === 0) {
+          container.innerHTML = '<p>No workers available.</p>';
+          return;
+        }
+
+        container.innerHTML = workers
+          .map((worker) => {
+            const badge = getBadgeType(worker.visa_expiry_date);
+
+            return `
+              <div class="worker-card">
+                <div>
+                  <a href="/workers/${worker.id}">${worker.name}</a>
+                  <div class="meta">${worker.nationality} • Visa expiry: ${worker.visa_expiry_date}</div>
+                </div>
+                <span class="badge ${badge.className}">${badge.label}</span>
+              </div>
+            `;
+          })
+          .join('');
+      };
+
+      fetch('/workers', { headers: { Accept: 'application/json' } })
+        .then((response) => response.json())
+        .then((workers) => {
+          const sorted = workers.slice().sort((a, b) => new Date(a.visa_expiry_date) - new Date(b.visa_expiry_date));
+          renderWorkers(sorted);
+        })
+        .catch(() => {
+          document.getElementById('workers').innerHTML = '<p>Failed to load workers.</p>';
+        });
+    </script>
+  </body>
+</html>

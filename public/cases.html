@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Visa Cases</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <h1>Visa Cases</h1>
+  <p><a href="/workers/1">View worker detail sample</a></p>
+
+  <div class="card">
+    <h2>Create Case</h2>
+    <form id="create-case-form" class="row">
+      <label>Worker
+        <select name="worker_id" id="worker-select" required></select>
+      </label>
+      <label>Case Type
+        <select name="case_type" required>
+          <option value="new-visa">New Visa</option>
+          <option value="renewal">Renewal</option>
+          <option value="change">Status Change</option>
+        </select>
+      </label>
+      <label>Status
+        <select name="status">
+          <option value="open">open</option>
+          <option value="in-review">in-review</option>
+          <option value="submitted">submitted</option>
+        </select>
+      </label>
+      <label>Due date <input type="date" name="due_date" /></label>
+      <label>Assigned user <input name="assigned_user" placeholder="e.g. admin@company.com" /></label>
+      <button type="submit">Create</button>
+    </form>
+  </div>
+
+  <div id="cases-list"></div>
+
+  <script src="/cases.js"></script>
+</body>
+</html>
