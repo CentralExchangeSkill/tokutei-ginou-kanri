@@ -1,0 +1,15 @@
+body { font-family: Arial, sans-serif; margin: 20px; background: #fafafa; color: #222; }
+a { color: #0b61c9; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+label { font-size: 14px; color: #444; }
+input, select, button { padding: 8px; border-radius: 4px; border: 1px solid #bbb; }
+button { background: #0b61c9; color: #fff; border: none; cursor: pointer; }
+button:hover { background: #084f9e; }
+ul { padding-left: 20px; }
+.status { padding: 2px 8px; border-radius: 10px; font-size: 12px; text-transform: uppercase; }
+.status.pending { background: #ffe8a3; }
+.status.in-progress { background: #cce5ff; }
+.status.done { background: #b7f5c7; }
+.small { font-size: 12px; color: #666; }

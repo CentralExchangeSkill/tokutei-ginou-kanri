@@ -1,0 +1,10 @@
+{
+  "name": "tokutei-ginou-kanri",
+  "version": "1.0.0",
+  "description": "Visa case and checklist management demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/smoke.test.js"
+  }
+}
