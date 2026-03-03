@@ -1,167 +1,158 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const {
-  getWorkers,
-  getWorkerWithCases,
-  createCase,
-  getCases,
-  getCaseDetail,
-  updateChecklistItem,
-  addChecklistDocument
-} = require('./db');
 
-const publicDir = path.join(__dirname, 'public');
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const PORT = process.env.PORT || 3000;
 
-function sendJson(res, code, payload) {
-  res.writeHead(code, { 'Content-Type': 'application/json' });
+/**
+ * Worker model:
+ * {
+ *   id: number,
+ *   name: string,
+ *   nationality: string,
+ *   visa_expiry_date: string (YYYY-MM-DD)
+ * }
+ */
+const workers = [
+  { id: 1, name: 'Nguyen Van A', nationality: 'Vietnam', visa_expiry_date: '2026-03-15' },
+  { id: 2, name: 'Sokha Chan', nationality: 'Cambodia', visa_expiry_date: '2026-01-05' },
+  { id: 3, name: 'Rizki Putra', nationality: 'Indonesia', visa_expiry_date: '2026-06-20' }
+];
+
+const parseDate = (value) => {
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(date.valueOf()) ? null : date;
+};
+
+const sortByVisaExpiryAsc = (list) => list.slice().sort((a, b) => {
+  const dateA = parseDate(a.visa_expiry_date);
+  const dateB = parseDate(b.visa_expiry_date);
+  return dateA - dateB;
+});
+
+const sendJson = (res, statusCode, payload) => {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(payload));
-}
+};
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+const sendFile = (res, filePath, contentType) => {
+  const fullPath = path.join(__dirname, filePath);
+  fs.readFile(fullPath, (error, data) => {
+    if (error) {
+      sendJson(res, 404, { message: 'Not found' });
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
   });
-}
+};
 
-function parseMultipart(buffer, boundary) {
-  const marker = Buffer.from(`--${boundary}`);
-  const parts = [];
-  let start = buffer.indexOf(marker) + marker.length + 2;
+const collectBody = (req) => new Promise((resolve, reject) => {
+  let body = '';
 
-  while (start < buffer.length) {
-    const end = buffer.indexOf(marker, start);
-    if (end === -1) break;
-    const part = buffer.subarray(start, end - 2);
-    const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
-    if (headerEnd > -1) {
-      const header = part.subarray(0, headerEnd).toString('utf-8');
-      const body = part.subarray(headerEnd + 4);
-      parts.push({ header, body });
-    }
-    start = end + marker.length + 2;
-  }
-  return parts;
-}
-
-function serveFile(res, filePath) {
-  if (!fs.existsSync(filePath)) {
-    res.writeHead(404);
-    return res.end('Not found');
-  }
-
-  const ext = path.extname(filePath);
-  const types = {
-    '.html': 'text/html; charset=utf-8',
-    '.js': 'application/javascript; charset=utf-8',
-    '.css': 'text/css; charset=utf-8',
-    '.json': 'application/json; charset=utf-8'
-  };
-  res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
-  fs.createReadStream(filePath).pipe(res);
-}
-
-function createServer() {
-  return http.createServer(async (req, res) => {
-    const url = new URL(req.url, 'http://localhost');
-
-    if (req.method === 'GET' && url.pathname === '/api/workers') {
-      return sendJson(res, 200, getWorkers());
-    }
-
-    if (req.method === 'GET' && url.pathname.startsWith('/api/workers/')) {
-      const worker = getWorkerWithCases(url.pathname.split('/').pop());
-      if (!worker) return sendJson(res, 404, { error: 'Worker not found' });
-      return sendJson(res, 200, worker);
-    }
-
-    if (req.method === 'POST' && url.pathname === '/api/cases') {
-      const raw = await readBody(req);
-      const payload = JSON.parse(raw.toString() || '{}');
-      if (!payload.worker_id || !payload.case_type) {
-        return sendJson(res, 400, { error: 'worker_id and case_type are required' });
-      }
-      const created = createCase(payload);
-      if (!created) return sendJson(res, 404, { error: 'Worker not found' });
-      return sendJson(res, 201, created);
-    }
-
-    if (req.method === 'GET' && url.pathname === '/api/cases') {
-      return sendJson(res, 200, getCases());
-    }
-
-    if (req.method === 'GET' && url.pathname.startsWith('/api/cases/')) {
-      const detail = getCaseDetail(url.pathname.split('/').pop());
-      if (!detail) return sendJson(res, 404, { error: 'Case not found' });
-      return sendJson(res, 200, detail);
-    }
-
-    if (req.method === 'PATCH' && url.pathname.startsWith('/api/checklist-items/')) {
-      const itemId = url.pathname.split('/').pop();
-      const raw = await readBody(req);
-      const payload = JSON.parse(raw.toString() || '{}');
-      if (!payload.status) return sendJson(res, 400, { error: 'status is required' });
-      const item = updateChecklistItem(itemId, payload.status);
-      if (!item) return sendJson(res, 404, { error: 'Checklist item not found' });
-      return sendJson(res, 200, item);
-    }
-
-    if (req.method === 'POST' && url.pathname.match(/^\/api\/checklist-items\/\d+\/documents$/)) {
-      const itemId = url.pathname.split('/')[3];
-      const contentType = req.headers['content-type'] || '';
-      const boundary = contentType.split('boundary=')[1];
-      if (!boundary) return sendJson(res, 400, { error: 'multipart/form-data required' });
-
-      const raw = await readBody(req);
-      const parts = parseMultipart(raw, boundary);
-      const filePart = parts.find((p) => p.header.includes('name="document"') && p.header.includes('filename='));
-      if (!filePart) return sendJson(res, 400, { error: 'document file is required' });
-
-      const filenameMatch = filePart.header.match(/filename="([^"]+)"/);
-      const originalName = filenameMatch ? filenameMatch[1] : 'upload.bin';
-      const safeName = `${Date.now()}-${originalName.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
-      const relativePath = path.join('uploads', safeName).replace(/\\/g, '/');
-      fs.writeFileSync(path.join(__dirname, relativePath), filePart.body);
-
-      const doc = addChecklistDocument(itemId, originalName, relativePath);
-      if (!doc) {
-        fs.unlinkSync(path.join(__dirname, relativePath));
-        return sendJson(res, 404, { error: 'Checklist item not found' });
-      }
-      return sendJson(res, 201, doc);
-    }
-
-    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/cases')) {
-      return serveFile(res, path.join(publicDir, 'cases.html'));
-    }
-    if (req.method === 'GET' && url.pathname.startsWith('/cases/')) {
-      return serveFile(res, path.join(publicDir, 'case-detail.html'));
-    }
-    if (req.method === 'GET' && url.pathname.startsWith('/workers/')) {
-      return serveFile(res, path.join(publicDir, 'worker-detail.html'));
-    }
-    if (req.method === 'GET' && url.pathname.startsWith('/uploads/')) {
-      return serveFile(res, path.join(__dirname, url.pathname));
-    }
-
-    const staticPath = path.join(publicDir, url.pathname);
-    if (req.method === 'GET' && staticPath.startsWith(publicDir) && fs.existsSync(staticPath)) {
-      return serveFile(res, staticPath);
-    }
-
-    res.writeHead(404);
-    res.end('Not found');
+  req.on('data', (chunk) => {
+    body += chunk.toString();
   });
-}
 
-if (require.main === module) {
-  const port = process.env.PORT || 3000;
-  createServer().listen(port, () => console.log(`Server running at http://localhost:${port}`));
-}
+  req.on('end', () => {
+    if (!body) {
+      resolve({});
+      return;
+    }
 
-module.exports = { createServer };
+    try {
+      resolve(JSON.parse(body));
+    } catch (_error) {
+      reject(new Error('Invalid JSON body'));
+    }
+  });
+});
+
+const server = http.createServer(async (req, res) => {
+  const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = requestUrl.pathname;
+  const method = req.method;
+  const accept = req.headers.accept || '';
+
+  if (method === 'GET' && pathname === '/') {
+    res.writeHead(302, { Location: '/workers' });
+    res.end();
+    return;
+  }
+
+  if (method === 'GET' && pathname === '/styles.css') {
+    sendFile(res, 'public/styles.css', 'text/css');
+    return;
+  }
+
+  if (method === 'GET' && pathname === '/workers' && accept.includes('text/html')) {
+    sendFile(res, 'public/workers.html', 'text/html');
+    return;
+  }
+
+  if (method === 'GET' && pathname === '/workers') {
+    sendJson(res, 200, sortByVisaExpiryAsc(workers));
+    return;
+  }
+
+  const workerIdMatch = pathname.match(/^\/workers\/(\d+)$/);
+  if (method === 'GET' && workerIdMatch && accept.includes('text/html')) {
+    sendFile(res, 'public/worker-detail.html', 'text/html');
+    return;
+  }
+
+  if (method === 'GET' && workerIdMatch) {
+    const workerId = Number.parseInt(workerIdMatch[1], 10);
+    const worker = workers.find((item) => item.id === workerId);
+
+    if (!worker) {
+      sendJson(res, 404, { message: 'Worker not found' });
+      return;
+    }
+
+    sendJson(res, 200, worker);
+    return;
+  }
+
+  if (method === 'POST' && pathname === '/workers') {
+    if (req.headers['x-user-role'] !== 'admin') {
+      sendJson(res, 403, { message: 'Admin role required' });
+      return;
+    }
+
+    try {
+      const payload = await collectBody(req);
+      const { name, nationality, visa_expiry_date: visaExpiryDate } = payload;
+
+      if (!name || !nationality || !visaExpiryDate) {
+        sendJson(res, 400, { message: 'name, nationality and visa_expiry_date are required' });
+        return;
+      }
+
+      if (!parseDate(visaExpiryDate)) {
+        sendJson(res, 400, { message: 'visa_expiry_date must be a valid YYYY-MM-DD date' });
+        return;
+      }
+
+      const newWorker = {
+        id: workers.length > 0 ? Math.max(...workers.map((item) => item.id)) + 1 : 1,
+        name,
+        nationality,
+        visa_expiry_date: visaExpiryDate
+      };
+
+      workers.push(newWorker);
+      sendJson(res, 201, newWorker);
+    } catch (_error) {
+      sendJson(res, 400, { message: 'Invalid JSON body' });
+    }
+    return;
+  }
+
+  sendJson(res, 404, { message: 'Not found' });
+});
+
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});

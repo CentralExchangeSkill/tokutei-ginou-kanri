@@ -1,18 +1,42 @@
 <!doctype html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Worker Detail</title>
-  <link rel="stylesheet" href="/styles.css" />
-</head>
-<body>
-  <p><a href="/cases">← Back to cases</a></p>
-  <div id="worker-card" class="card"></div>
-  <div class="card">
-    <h2>Visa Cases</h2>
-    <div id="worker-cases"></div>
-  </div>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Worker Detail</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <p><a href="/workers">← Back to workers</a></p>
+      <h1>Worker Detail</h1>
+      <div id="content"></div>
+    </div>
 
-  <script src="/worker-detail.js"></script>
-</body>
+    <script>
+      const workerId = window.location.pathname.split('/')[2];
+
+      fetch(`/workers/${workerId}`, { headers: { Accept: 'application/json' } })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Not found');
+          }
+          return response.json();
+        })
+        .then((worker) => {
+          document.getElementById('content').innerHTML = `
+            <div class="worker-card">
+              <div>
+                <h2>${worker.name}</h2>
+                <div class="meta">Nationality: ${worker.nationality}</div>
+                <div class="meta">Visa expiry date: ${worker.visa_expiry_date}</div>
+              </div>
+            </div>
+          `;
+        })
+        .catch(() => {
+          document.getElementById('content').innerHTML = '<p>Worker not found.</p>';
+        });
+    </script>
+  </body>
 </html>

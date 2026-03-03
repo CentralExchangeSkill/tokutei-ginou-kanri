@@ -1,4 +1,19 @@
-node_modules/
-data.json
-uploads/*
-!uploads/.gitkeep
+# Dependencies
+node_modules
+
+# Environment
+.env
+.env.*
+!.env.example
+dist
+coverage
+.vite
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# Prisma local db
+apps/api/prisma/dev.db
